@@ -1,0 +1,1 @@
+cdk deploy -c S3_IMAGE_BUCKET_NAME=mylaravel

@@ -1,10 +1,8 @@
-// Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
-// SPDX-License-Identifier: MIT-0
 
 // All regions and their ordering are taken from
 // https://docs.aws.amazon.com/AmazonCloudFront/latest/DeveloperGuide/origin-shield.html
 
-// Regions with Regional Edge Caches
+// Regions with Regional-Edge Caches
 const REC_REGIONS = {
   US_EAST_2: "us-east-2",             //  1. US East (Ohio)
   US_EAST_1: "us-east-1",             //  2. US East (N. Virginia) 

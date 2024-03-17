@@ -1,18 +1,26 @@
-// Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
-// SPDX-License-Identifier: MIT-0
-
 function handler(event) {
-    var request = event.request;
-    var originalImagePath = request.uri;
-    //  validate, process and normalize the requested operations in query parameters
-    var normalizedOperations = {};
+    let request = event.request;
+    let originalImagePath = request.uri;
+
+    /**
+     * Validate, process and normalize the requested operations in query parameters
+     */
+    let imageOperations = {};
+
     if (request.querystring) {
         Object.keys(request.querystring).forEach(operation => {
             switch (operation.toLowerCase()) {
                 case 'format': 
-                    var SUPPORTED_FORMATS = ['auto', 'jpeg', 'webp', 'avif', 'png', 'svg', 'gif'];
+
+                    let SUPPORTED_FORMATS = ['auto', 'jpeg', 'webp', 'avif', 'png'];
+
                     if (request.querystring[operation]['value'] && SUPPORTED_FORMATS.includes(request.querystring[operation]['value'].toLowerCase())) {
-                        var format = request.querystring[operation]['value'].toLowerCase(); // normalize to lowercase
+
+                        /**
+                         * Normalize to lowercase
+                         */
+                        let format = request.querystring[operation]['value'].toLowerCase();
+
                         if (format === 'auto') {
                             format = 'jpeg';
                             if (request.headers['accept']) {
@@ -23,58 +31,86 @@ function handler(event) {
                                 } 
                             }
                         }
-                        normalizedOperations['format'] = format;
+                        imageOperations['format'] = format;
                     }
                     break;
                 case 'width':
                     if (request.querystring[operation]['value']) {
-                        var width = parseInt(request.querystring[operation]['value']);
+                        let width = parseInt(request.querystring[operation]['value']);
                         if (!isNaN(width) && (width > 0)) {
-                            // you can protect the Lambda function by setting a max value, e.g. if (width > 4000) width = 4000;
-                            normalizedOperations['width'] = width.toString();
+                            /**
+                             * You can protect the Lambda function by setting a max value, e.g. if (width > 4000) width = 4000;
+                             */
+                            imageOperations['width'] = width.toString();
                         }
                     }
                     break;
                 case 'height':
                     if (request.querystring[operation]['value']) {
-                        var height = parseInt(request.querystring[operation]['value']);
+                        let height = parseInt(request.querystring[operation]['value']);
                         if (!isNaN(height) && (height > 0)) {
-                            // you can protect the Lambda function by setting a max value, e.g. if (height > 4000) height = 4000;
-                            normalizedOperations['height'] = height.toString();
+                            /**
+                             * You can protect the Lambda function by setting a max value, e.g. if (height > 4000) height = 4000;
+                             */
+                            imageOperations['height'] = height.toString();
                         }
                     }
                     break;
                 case 'quality':
                     if (request.querystring[operation]['value']) {
-                        var quality = parseInt(request.querystring[operation]['value']);
+                        let quality = parseInt(request.querystring[operation]['value']);
                         if (!isNaN(quality) && (quality > 0)) {
                             if (quality > 100) quality = 100;
-                            normalizedOperations['quality'] = quality.toString();
+                            imageOperations['quality'] = quality.toString();
                         }
                     }
                     break;
                 default: break;
             }
         });
-        //rewrite the path to normalized version if valid operations are found
-        if (Object.keys(normalizedOperations).length > 0) {
-            // put them in order
-            var normalizedOperationsArray = [];
-            if (normalizedOperations.format) normalizedOperationsArray.push('format='+normalizedOperations.format);
-            if (normalizedOperations.quality) normalizedOperationsArray.push('quality='+normalizedOperations.quality);
-            if (normalizedOperations.width) normalizedOperationsArray.push('width='+normalizedOperations.width);
-            if (normalizedOperations.height) normalizedOperationsArray.push('height='+normalizedOperations.height);
-            request.uri = originalImagePath + '/' + normalizedOperationsArray.join(',');     
+
+        /**
+         * Rewrite the path to normalized version if valid operations are found
+         */
+        if (Object.keys(imageOperations).length > 0) {
+
+            let queryStrings = [];
+
+            if (imageOperations.format) {
+                queryStrings.push('format='+imageOperations.format)
+            }
+
+            if (imageOperations.quality) {
+                queryStrings.push('quality='+imageOperations.quality)
+            }
+
+            if (imageOperations.width) {
+                queryStrings.push('width='+imageOperations.width)
+            }
+
+            if (imageOperations.height) {
+                queryStrings.push('height='+imageOperations.height)
+            }
+
+            request.uri = originalImagePath + '/' + queryStrings.join(',');
         } else {
-            // If no valid operation is found, flag the request with /original path suffix
-            request.uri = originalImagePath + '/original';     
+
+            /**
+             * If no valid operation is found, flag the request with /original path suffix
+             */
+            request.uri = originalImagePath + '/original';
         }
 
     } else {
-        // If no query strings are found, flag the request with /original path suffix
+        /**
+         * If no query strings are found, flag the request with /original path suffix
+         */
         request.uri = originalImagePath + '/original'; 
     }
-    // remove query strings
+
+    /**
+     * Remove query strings
+     */
     request['querystring'] = {};
     return request;
 }
