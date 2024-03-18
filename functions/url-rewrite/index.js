@@ -1,6 +1,3 @@
-// Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
-// SPDX-License-Identifier: MIT-0
-
 function handler(event) {
     var request = event.request;
     var originalImagePath = request.uri;
@@ -9,7 +6,7 @@ function handler(event) {
     if (request.querystring) {
         Object.keys(request.querystring).forEach(operation => {
             switch (operation.toLowerCase()) {
-                case 'format': 
+                case 'format':
                     var SUPPORTED_FORMATS = ['auto', 'jpeg', 'webp', 'avif', 'png', 'svg', 'gif'];
                     if (request.querystring[operation]['value'] && SUPPORTED_FORMATS.includes(request.querystring[operation]['value'].toLowerCase())) {
                         var format = request.querystring[operation]['value'].toLowerCase(); // normalize to lowercase
@@ -20,7 +17,7 @@ function handler(event) {
                                     format = 'avif';
                                 } else if (request.headers['accept'].value.includes("webp")) {
                                     format = 'webp';
-                                } 
+                                }
                             }
                         }
                         normalizedOperations['format'] = format;
@@ -64,15 +61,15 @@ function handler(event) {
             if (normalizedOperations.quality) normalizedOperationsArray.push('quality='+normalizedOperations.quality);
             if (normalizedOperations.width) normalizedOperationsArray.push('width='+normalizedOperations.width);
             if (normalizedOperations.height) normalizedOperationsArray.push('height='+normalizedOperations.height);
-            request.uri = originalImagePath + '/' + normalizedOperationsArray.join(',');     
+            request.uri = originalImagePath + '/' + normalizedOperationsArray.join(',');
         } else {
             // If no valid operation is found, flag the request with /original path suffix
-            request.uri = originalImagePath + '/original';     
+            request.uri = originalImagePath + '/original';
         }
 
     } else {
         // If no query strings are found, flag the request with /original path suffix
-        request.uri = originalImagePath + '/original'; 
+        request.uri = originalImagePath + '/original';
     }
     // remove query strings
     request['querystring'] = {};
