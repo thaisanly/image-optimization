@@ -1,6 +1,3 @@
-// Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
-// SPDX-License-Identifier: MIT-0
-
 import {
   aws_cloudfront as cloudfront,
   aws_cloudfront_origins as origins,
@@ -65,7 +62,9 @@ export class ImageOptimizationStack extends Stack {
   constructor(scope: Construct, id: string, props?: StackProps) {
     super(scope, id, props);
 
-    // Change stack parameters based on provided context
+    /**
+     * Change stack parameters based on provided context
+     */
     ENV = this.node.tryGetContext('ENV') || ENV;
     STORE_TRANSFORMED_IMAGES = this.node.tryGetContext('STORE_TRANSFORMED_IMAGES') || STORE_TRANSFORMED_IMAGES;
     S3_TRANSFORMED_IMAGE_EXPIRATION_DURATION = this.node.tryGetContext('S3_TRANSFORMED_IMAGE_EXPIRATION_DURATION') || S3_TRANSFORMED_IMAGE_EXPIRATION_DURATION;
@@ -77,10 +76,14 @@ export class ImageOptimizationStack extends Stack {
     LAMBDA_TIMEOUT = this.node.tryGetContext('LAMBDA_TIMEOUT') || LAMBDA_TIMEOUT;
     MAX_IMAGE_SIZE = this.node.tryGetContext('MAX_IMAGE_SIZE') || MAX_IMAGE_SIZE;
 
-    // Create secret key to be used between CloudFront and Lambda URL for access control
+    /**
+     * Create secret key to be used between CloudFront and Lambda URL for access control
+     */
     const SECRET_KEY = createHash('md5').update(this.node.addr).digest('hex');
 
-    // For the bucket having original images, either use an external one, or create one with some samples photos.
+    /**
+     * For the bucket having original images, either use an external one, or create one with some samples photos.
+     */
     let originalImageBucket = s3.Bucket.fromBucketName(this, 'imported-original-image-bucket-' + ENV.toLowerCase(), S3_IMAGE_BUCKET_NAME);
 
     new CfnOutput(this, 'OriginalImagesS3Bucket-' + ENV.toLowerCase(), {
@@ -88,7 +91,9 @@ export class ImageOptimizationStack extends Stack {
       value: originalImageBucket.bucketName
     });
 
-    // create bucket for transformed images if enabled in the architecture
+    /**
+     * create bucket for transformed images if enabled in the architecture
+     */
     let transformedImageBucket = new s3.Bucket(this, 's3-transformed-image-bucket-' + ENV.toLowerCase(), {
         bucketName: originalImageBucket.bucketName + "-optimization-" + ENV.toLowerCase(),
         removalPolicy: RemovalPolicy.DESTROY,
@@ -100,7 +105,9 @@ export class ImageOptimizationStack extends Stack {
         ],
       });
 
-    // prepare env variable for Lambda 
+    /**
+     * prepare env variable for Lambda
+     */
     const lambdaEnv: LambdaEnv = {
       transformedImageBucketName: transformedImageBucket.bucketName,
       originalImageBucketName: originalImageBucket.bucketName,
@@ -109,16 +116,22 @@ export class ImageOptimizationStack extends Stack {
       maxImageSize: MAX_IMAGE_SIZE,
     };
 
-    // IAM policy to read from the S3 bucket containing the original images
+    /**
+     * IAM policy to read from the S3 bucket containing the original images
+     */
     const s3ReadOriginalImagesPolicy = new iam.PolicyStatement({
       actions: ['s3:GetObject'],
       resources: ['arn:aws:s3:::' + originalImageBucket.bucketName + '/*'],
     });
 
-    // statements of the IAM policy to attach to Lambda
+    /**
+     * statements of the IAM policy to attach to Lambda
+     */
     const iamPolicyStatements = [s3ReadOriginalImagesPolicy];
 
-    // Create Lambda for image processing
+    /**
+     * Create Lambda for image processing
+     */
     const lambdaProps = {
       runtime: lambda.Runtime.NODEJS_20_X,
       handler: 'index.handler',
@@ -131,15 +144,22 @@ export class ImageOptimizationStack extends Stack {
 
     const imageProcessing = new lambda.Function(this, 'image-optimization-' + ENV.toLowerCase(), lambdaProps);
 
-    // Enable Lambda URL
+    /**
+     * Enable Lambda URL
+     */
     const imageProcessingURL = imageProcessing.addFunctionUrl({
       authType: lambda.FunctionUrlAuthType.NONE,
     });
 
-    // Leverage CDK Intrinsics to get the hostname of the Lambda URL 
+    /**
+     * Leverage CDK Intrinsics to get the hostname of the Lambda URL
+     */
     const imageProcessingDomainName = Fn.parseDomainName(imageProcessingURL.url);
 
-    // Create a CloudFront origin: S3 with fallback to Lambda when image needs to be transformed, otherwise with Lambda as sole origin
+    /**
+     * Create a CloudFront origin: S3 with fallback to Lambda when image needs to be transformed,
+     * otherwise with Lambda as sole origin
+     */
     let imageOrigin = new origins.OriginGroup({
       primaryOrigin: new origins.S3Origin(transformedImageBucket, {
         originShieldRegion: CLOUDFRONT_ORIGIN_SHIELD_REGION,
@@ -153,7 +173,9 @@ export class ImageOptimizationStack extends Stack {
       fallbackStatusCodes: [403, 500, 503, 504],
     });
 
-    // write policy for Lambda on the s3 bucket for transformed images
+    /**
+     * write policy for Lambda on the s3 bucket for transformed images
+     */
     const s3WriteTransformedImagesPolicy = new iam.PolicyStatement({
       actions: ['s3:PutObject'],
       resources: ['arn:aws:s3:::' + transformedImageBucket.bucketName + '/*'],
@@ -161,17 +183,22 @@ export class ImageOptimizationStack extends Stack {
 
     iamPolicyStatements.push(s3WriteTransformedImagesPolicy);
 
-    // attach iam policy to the role assumed by Lambda
+    /**
+     * attach iam policy to the role assumed by Lambda
+     */
     imageProcessing.role?.attachInlinePolicy(
       new iam.Policy(this, 'read-write-bucket-policy', {
         statements: iamPolicyStatements,
       }),
     );
 
-    // Create a CloudFront Function for url rewrites
+    /**
+     * Create a CloudFront Function for url rewrites
+     */
     const urlRewriteFunction = new cloudfront.Function(this, 'url-rewrite-' + ENV.toLowerCase(), {
       code: cloudfront.FunctionCode.fromFile({ filePath: 'functions/url-rewrite/index.js', }),
       functionName: 'ImageOptimizeUrlRewrite-' + ENV.toLowerCase(),
+      runtime: cloudfront.FunctionRuntime.JS_2_0
     });
 
     const imageDeliveryCacheBehaviorConfig: ImageDeliveryCacheBehaviorConfig = {
@@ -191,7 +218,9 @@ export class ImageOptimizationStack extends Stack {
 
     if (CLOUDFRONT_CORS_ENABLED === 'true') {
 
-      // Creating a custom response headers policy. CORS allowed for all origins.
+      /**
+       * Creating a custom response headers policy. CORS allowed for all origins.
+       */
       imageDeliveryCacheBehaviorConfig.responseHeadersPolicy = new cloudfront.ResponseHeadersPolicy(this, `ResponseHeadersPolicy-` + ENV.toLowerCase(), {
         responseHeadersPolicyName: 'ImageResponsePolicy-' + ENV.toLowerCase(),
         corsBehavior: {
@@ -203,7 +232,9 @@ export class ImageOptimizationStack extends Stack {
           originOverride: false,
         },
 
-        // recognizing image requests processed by this solution
+        /**
+         * recognizing image requests processed by this solution
+         */
         customHeadersBehavior: {
           customHeaders: [
             {header: 'x-aws-image-optimization', value: 'v1.0', override: true},

@@ -9,6 +9,9 @@ const SECRET_KEY = process.env.secretKey;
 const MAX_IMAGE_SIZE = parseInt(process.env.maxImageSize);
 
 export const handler = async (event) => {
+
+    console.log(event);
+
     /**
      * First validate if the request is coming from CloudFront
      */
@@ -48,6 +51,27 @@ export const handler = async (event) => {
      */
     let originalImageBody;
     let contentType;
+
+    /**
+     * Response original file from bucket anyway
+     */
+    if (/original$/.test(event.requestContext.http.path)){
+
+        const s3Response = await s3Client.send(new GetObjectCommand({
+            Bucket: S3_ORIGINAL_IMAGE_BUCKET,
+            Key: originalImagePath,
+        }));
+
+        return {
+            statusCode: 200,
+            headers: {
+                'Content-Type': s3Response.ContentType,
+                'Content-Length': s3Response.ContentLength,
+            },
+            isBase64Encoded: false,
+            body: s3Response.Body,
+        };
+    }
 
     try {
         const getOriginalImageCommand = new GetObjectCommand({ Bucket: S3_ORIGINAL_IMAGE_BUCKET, Key: originalImagePath });
@@ -132,7 +156,7 @@ export const handler = async (event) => {
     timingLog = timingLog + ',img-transform;dur=' + parseInt(performance.now() - startTime);
 
     /**
-     * handle gracefully generated images bigger than a specified limit (e.g. Lambda output object limit)
+     * handle gracefully generated images bigger than a specified limit (e.g., Lambda output object limit)
      */
     const imageTooBig = Buffer.byteLength(transformedImage) > MAX_IMAGE_SIZE;
 
@@ -177,7 +201,9 @@ export const handler = async (event) => {
      */
     if (imageTooBig) {
         return sendError(403, 'Requested transformed image is too big', '');
-    } else return {
+    }
+
+    return {
         statusCode: 200,
         body: transformedImage.toString('base64'),
         isBase64Encoded: true,
