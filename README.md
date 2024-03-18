@@ -53,7 +53,3 @@ To remove cloud resources created for this solution, just execute the following 
 cdk destroy -c ENV=test -c S3_IMAGE_BUCKET_NAME=bucket
 ```
 
-## License
-
-This library is licensed under the MIT-0 License. See the LICENSE file.
-
